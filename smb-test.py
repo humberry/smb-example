@@ -10,6 +10,7 @@ from smb import smb_structs
 from nmb.NetBIOS import NetBIOS
 import os
 
+#queryIPForNmae found here: http://stackoverflow.com/questions/13252443/pysmb-windows-file-share-buffer-overflow
 def getBIOSName(remote_smb_ip, timeout=5):
   try:
     bios = NetBIOS()
