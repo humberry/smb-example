@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
-
-#you need these two modules: pysmb and pyasn1
-#extract pysmb-1.1.13/python2/ and copy /smb and /nmb to site-packages
-#extract pyasn1-0.1.7/ and copy /pyasn1 to site-packages
+# Attention: Please use pysmb 1.1.14
 
 from cStringIO import StringIO
 from smb.SMBConnection import SMBConnection
 from smb import smb_structs
 from nmb.NetBIOS import NetBIOS
 import os
+from socket import gethostname
 
-#queryIPForNmae found here: http://stackoverflow.com/questions/13252443/pysmb-windows-file-share-buffer-overflow
 def getBIOSName(remote_smb_ip, timeout=5):
   try:
     bios = NetBIOS()
@@ -19,6 +16,7 @@ def getBIOSName(remote_smb_ip, timeout=5):
     print 'getBIOSName: timeout too short?'
   finally:
     bios.close()
+    #print 'bios name = ' + srv_name[0]
     return srv_name[0]
 
 def getServiceName(username, password, my_name, remote_name, remote_ip):
@@ -33,21 +31,29 @@ def getServiceName(username, password, my_name, remote_name, remote_ip):
     return ''
 
 def getRemoteDir(username, password, my_name, remote_name, remote_ip, path, pattern, service_name):
+  print('getRemoteDir() starts...')
   conn = connect(username, password, my_name, remote_name, remote_ip)
   if conn:
     try:
       files = conn.listPath(service_name, path, pattern=pattern)
       #files = conn.listPath(service_name, path)
-      conn.close()
+      #print('returning: {}'.format(files))
       return files
     except Exception, e:
-      print e
+      fmt = 'conn.listPath({}, {}, {}) threw {}: {}'
+      print(fmt.format(service_name, path, pattern, type(e), e))
+      #print(type(e))
+    finally:
+      conn.close()
+  else:
+    print('connect() failed!')
+  return None
 
 def connect(username, password, my_name, remote_name, remote_ip):
-  smb_structs.SUPPORT_SMB2 = False
-  conn = SMBConnection(username, password, my_name, remote_name, use_ntlm_v2 = True, is_direct_tcp = True)
+  smb_structs.SUPPORT_SMB2 = True
+  conn = SMBConnection(username, password, my_name, remote_name, use_ntlm_v2 = True)
   try:
-    conn.connect(remote_ip, 445) #139=NetBIOS / 445=TCP
+    conn.connect(remote_ip, 139) #139=NetBIOS / 445=TCP
   except Exception, e:
     print e
   return conn
@@ -87,25 +93,82 @@ def delete_remote_file(username, password, my_name, remote_name, remote_ip, path
     print 'Remotefile ' + path + filename + ' deleted'
     conn.close()
 
+def createRemoteDir(username, password, my_name, remote_name, remote_ip, path, service_name):
+  conn = connect(username, password, my_name, remote_name, remote_ip)
+  if conn:
+    try:
+      conn.createDirectory(service_name, path)
+    except Exception, e:
+      fmt = 'conn.listPath({}, {}, {}) threw {}: {}'
+      print(fmt.format(service_name, path, pattern, type(e), e))
+    finally:
+      conn.close()
+  else:
+    print('connect() failed!')
+  return None
+  
+def removeRemoteDir(username, password, my_name, remote_name, remote_ip, path, service_name):
+  conn = connect(username, password, my_name, remote_name, remote_ip)
+  if conn:
+    try:
+      conn.deleteDirectory(service_name, path)
+    except Exception, e:
+      fmt = 'conn.listPath({}, {}, {}) threw {}: {}'
+      print(fmt.format(service_name, path, pattern, type(e), e))
+    finally:
+      conn.close()
+  else:
+    print('connect() failed!')
+  return None
+
+def removeRemoteDir(username, password, my_name, remote_name, remote_ip, old_path, new_path, service_name):
+  conn = connect(username, password, my_name, remote_name, remote_ip)
+  if conn:
+    try:
+      conn.rename(service_name, old_path, new_path)
+    except Exception, e:
+      fmt = 'conn.listPath({}, {}, {}) threw {}: {}'
+      print(fmt.format(service_name, path, pattern, type(e), e))
+    finally:
+      conn.close()
+  else:
+    print('connect() failed!')
+  return None
 
 username = 'admin'
-password = 'admin-password'
-my_name = 'pythonista'
-remote_ip = '192.168.1.100'
-remote_name = getBIOSName(remote_ip)
-filename = 'guide.pdf'
-path = '/share/'
+password = 'raspi4715'
+#my_name = 'iPad'
+my_name = gethostname()
+remote_ip = '10.10.10.254'
+#remote_name = getBIOSName(remote_ip)
+#remote_name = 'tm02'
+remote_name = '10.10.10.254'
+filename = 'raspi-guide.pdf'
+#filename = 'smb-example.py'
+#new_filename = 'smb-example2.py'
+
+path = '/'
+#path = '/share/'
+
 service_name = getServiceName(username, password, my_name, remote_name, remote_ip)
-pattern = '*.*'
+#service_name = 'IPC$'
+pattern = '*'
+
+#removeRemoteDir(username, password, my_name, remote_name, remote_ip, path + filename, path + new_filename, service_name)
+
+#removeRemoteDir(username, password, my_name, remote_name, remote_ip, path, service_name)
+
+#createRemoteDir(username, password, my_name, remote_name, remote_ip, path, service_name)
 
 #download(username, password, my_name, remote_name, remote_ip, path, filename, service_name)
+
 #upload(username, password, my_name, remote_name, remote_ip, path, filename, service_name)
+
 #delete_remote_file(username, password, my_name, remote_name, remote_ip, path, filename, service_name)
 
 '''
-#always trouble with listPath() ...
 files = getRemoteDir(username, password, my_name, remote_name, remote_ip, path, pattern, service_name)
 if files:
   for file in files:
-    print file
+    print file.filename
 '''
